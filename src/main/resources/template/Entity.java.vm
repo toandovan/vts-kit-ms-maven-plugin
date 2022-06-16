@@ -1,0 +1,11 @@
+package ${package}.domain;
+
+import com.example.utils.CommonUtils;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+public class ${entityName} {
+
+}
