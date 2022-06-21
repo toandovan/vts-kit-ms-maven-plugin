@@ -48,7 +48,7 @@ public class DockerDeployment extends AbstractMojo {
             mapLv2.put("image", imagePrefix+artifactId+":"+version);
             mapLv2.put("container_name", artifactId);
             mapLv2.put("restart", "always");
-            mapLv3.put("POSTGRES_PASSWORD","123456");
+            mapLv3.put("ENV_EXAMPLE","value");
             mapLv2.put("environment",mapLv3);
             ArrayList<String> list=new ArrayList();
             list.add(port+":"+port);

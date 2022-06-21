@@ -1,0 +1,6 @@
+package ${package}.repository;
+import com.example.domain.${name};
+import com.viettel.vtskit.maria.repository.MariaRepository;
+public interface ${name}Repository extends MariaRepository<${name}, String> {
+
+}

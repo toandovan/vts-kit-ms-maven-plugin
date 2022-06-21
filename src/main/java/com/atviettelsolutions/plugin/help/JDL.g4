@@ -8,7 +8,7 @@ program: (entity_declaration|relationship |dto_declaration)* EOF;
 entity_declaration : ENTITY ID table_name? entity_body?; 
 table_name: LSB ID RSB;
 entity_body: LP entity_field* RP;
-entity_field: ID entity_type entity_validate* SEMI;
+entity_field: ID type entity_validate* SEMI;
 entity_validate: REQUIRE | UNIQUE;
 
 //relationship
@@ -20,14 +20,14 @@ display_field: LB ID RB;
 //DTO
 dto_declaration : DTO dto_list;
 dto_list: ID LSB dto_field* RSB;// DTO Test[ ABC String require, XYZ String require]
-dto_field: ID ID REQUIRE? SEMI;
+dto_field: ID type REQUIRE? SEMI;
 
-entity_type: STRING | FLOAT | DOUBLE | LONG;
+type: STRING | FLOAT | DOUBLE | LONG;
 //Type:
-STRING: 'string';
-FLOAT: 'float';
-DOUBLE: 'double';
-LONG: 'long';
+STRING: 'String';
+FLOAT: 'Float';
+DOUBLE: 'Double';
+LONG: 'Long';
 
 
 //(OneToMany | ManyToOne | OneToOne | ManyToMany)

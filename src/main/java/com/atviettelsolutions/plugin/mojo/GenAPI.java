@@ -183,9 +183,11 @@ public class GenAPI extends AbstractMojo {
             methodDeclaration.setType(response);
             methodDeclaration.setPublic(true);
             methodDeclaration.setParameters(parameter);
-            Node node=new ReturnStmt("new "+response+"()");
-            NodeList nodeList=new NodeList<>(node);
-            BlockStmt blockStmt=new BlockStmt(nodeList);
+            Expression expression=new AssignExpr(new NameExpr(response+" result"),new NameExpr("new "+response+"()"),AssignExpr.Operator.ASSIGN);
+            ReturnStmt node=new ReturnStmt("result");
+            BlockStmt blockStmt=new BlockStmt();
+            blockStmt.addStatement(expression);
+            blockStmt.addStatement(node);
             methodDeclaration.setBody(blockStmt);
             methodDeclaration.addAnnotation("Override");
             AST.getMembers().add(methodDeclaration);
@@ -307,7 +309,6 @@ public class GenAPI extends AbstractMojo {
             }
             //get class controller
 
-
             //check api exist
             if(AST.getMethodsByName(apiName).isEmpty() && !apiName.isEmpty()){
                 MethodDeclaration methodDeclaration=new MethodDeclaration();
@@ -321,7 +322,12 @@ public class GenAPI extends AbstractMojo {
                 if(paramType!=""){
                     controllerImport.add(groupId+".dto."+paramType);
                     com.github.javaparser.ast.body.Parameter param=new com.github.javaparser.ast.body.Parameter(new ClassOrInterfaceType(paramType),paramName);
-                    listParameterForController.add(param);
+                    com.github.javaparser.ast.body.Parameter temp=new com.github.javaparser.ast.body.Parameter(new ClassOrInterfaceType(paramType),paramName);;
+                    temp.addAnnotation("Valid");
+                    temp.addAnnotation("RequestBody");
+                    controllerImport.add("javax.validation.Valid");
+                    controllerImport.add("org.springframework.web.bind.annotation.RequestBody");
+                    listParameterForController.add(temp);
                     listArgumentForService.add(paramName);
                     listParameterForService.add(param);
                 }

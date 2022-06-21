@@ -3,6 +3,7 @@ package com.atviettelsolutions.plugin.mojo;
 import com.atviettelsolutions.plugin.help.WriteFileToTemp;
 import com.atviettelsolutions.plugin.help.antlr.JDLLexer;
 import com.atviettelsolutions.plugin.help.antlr.JDLParser;
+import com.github.javaparser.JavaParser;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.FieldDeclaration;
@@ -53,30 +54,16 @@ public class TestParser extends AbstractMojo {
     String classPathResourceDTO = "template/DTO.java.vm";
     String classPathResourceEntity = "template/Entity.java.vm";
 
+    String classPathResourceRepository = "template/Repository.java.vm";
+
     public TestParser() {
         this.velocityEngine=new VelocityEngine();
         velocityEngine.setProperty("file.resource.loader.path", "");
         velocityEngine.init();
     }
 
-    public void createDTO(String dtoName, List<FieldDeclaration> field) throws IOException {
-        String dtoPath=baseDir.toString().concat("/src/main/java/"+packed+"/dto/"+dtoName+".java");
-        Path path = Paths.get(dtoPath);
-        CompilationUnit cu = null;
-        String code="";
-        if(!Files.exists(path)){
-            Template t=template(classPathResourceDTO);
-            StringWriter writer = new StringWriter();
-            VelocityContext context = new VelocityContext();
-            context.put("package", groupId);
-            context.put("dtoName", dtoName);
-            t.merge( context, writer );
-            code = writer.toString();
-            cu = parse(code);
-        }else {
-            FileInputStream fileInputStream= new FileInputStream(dtoPath);
-            cu = parse(fileInputStream);
-        }
+    public CompilationUnit createDTO(String dtoName,CompilationUnit cu,List<FieldDeclaration> field) throws IOException {
+
         Optional<ClassOrInterfaceDeclaration> classAST=cu.getClassByName(dtoName);
         ClassOrInterfaceDeclaration AST=classAST.get();
         field.forEach(e->{
@@ -85,8 +72,8 @@ public class TestParser extends AbstractMojo {
                 AST.getMembers().add(e);
             }
         });
-        code=cu.toString();
-        writeCodeToFile(code,dtoPath);
+        return cu;
+//        writeCodeToFile(cu.toString(),dtoPath);
     }
     public Template template(String classPathResource) throws IOException {
         ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
@@ -102,14 +89,56 @@ public class TestParser extends AbstractMojo {
         outStream.write(strToBytes);
     }
 
+    public VelocityContext setContext(VelocityContext context,String type, List<String> data){
+        switch (type){
+            case "DTO":
+                context.put("package", groupId);
+                context.put("dtoName", data.get(0));
+            case "ENTITY":
+                context.put("package", groupId);
+                context.put("entityName", data.get(0));
+        }
+        return context;
+    }
+    public Template loadTemplate(String type) throws IOException {
+        Template t=null;
+        switch (type){
+            case "DTO":
+                t=template(classPathResourceDTO);
+            case "ENTITY":
+                t=template(classPathResourceEntity);
+        }
+        return t;
+    }
+    public CompilationUnit loadCompilationUnit(String sourcePath, String type, List<String> data) throws IOException {
+        Path path = Paths.get(sourcePath);
+        CompilationUnit cu = null;
+        String code="";
+        if(!Files.exists(path)){
+            VelocityContext context=setContext(new VelocityContext(), type, data);
+            Template t=loadTemplate(type);
+            StringWriter writer = new StringWriter();
+            t.merge( context, writer );
+            code = writer.toString();
+            cu= parse(code);
+        }else {
+            FileInputStream fileInputStream= new FileInputStream(sourcePath);
+            cu = parse(fileInputStream);
+        }
+        return cu;
+    }
     public void createDTOs(List<JDLParser.Dto_declarationContext> dto) throws IOException {
         for (int i = 0; i < dto.size(); i++) {
             List<JDLParser.Dto_fieldContext> fieldList = dto.get(i).dto_list().dto_field();
             List<FieldDeclaration> list = new LinkedList<>();
             String dtoName = dto.get(i).dto_list().ID().getText();
+            String dtoPath=baseDir.toString().concat("/src/main/java/"+packed+"/dto/"+dtoName+".java");
+            List<String> data=new LinkedList<>();
+            data.add(dtoName);
+            CompilationUnit compilationUnit=loadCompilationUnit(dtoPath, "DTO", data);
             for (int j = 0; j < fieldList.size(); j++) {
-                String name = fieldList.get(i).ID(0).getText();
-                String type = fieldList.get(i).ID(1).getText();
+                String name = fieldList.get(i).ID().getText();
+                String type = fieldList.get(i).type().getText();
                 String require = fieldList.get(i).REQUIRE() == null ? "" : fieldList.get(i).REQUIRE().getText();
                 FieldDeclaration fieldDeclaration =
                         new FieldDeclaration()
@@ -120,13 +149,16 @@ public class TestParser extends AbstractMojo {
                         normalAnnotationExpr.setName("NotEmpty");
                         normalAnnotationExpr.addPair("message", "\"" + name + " must not empty" + "\"");
                         fieldDeclaration.addAnnotation(normalAnnotationExpr);
+                        compilationUnit.addImport("javax.validation.constraints.NotEmpty");
                     } else {
                         fieldDeclaration.addAnnotation("NotNull");
+                        compilationUnit.addImport("javax.validation.constraints.NotNull");
                     }
                 }
                 list.add(fieldDeclaration);
             }
-            createDTO(dtoName, list);
+            CompilationUnit code=createDTO(dtoName, compilationUnit, list);
+            writeCodeToFile(code.toString(),dtoPath);
         }
     }
 
@@ -135,32 +167,21 @@ public class TestParser extends AbstractMojo {
             JDLParser.Entity_declarationContext ele=entity.get(i);
             String entity_name = ele.ID().getText();
             List<JDLParser.Entity_fieldContext> fieldList=ele.entity_body()!= null?ele.entity_body().entity_field(): new LinkedList<>();
-            createEntity(entity_name, fieldList);
+            String entityPath=baseDir.toString().concat("/src/main/java/"+packed+"/domain/"+entity_name+".java");
+            List<String> data=new LinkedList<>();
+            data.add(entity_name);
+            CompilationUnit compilationUnit=loadCompilationUnit(entityPath,"ENTITY", data);
+            CompilationUnit code=createEntity(entity_name, compilationUnit, fieldList);
+            writeCodeToFile(code.toString(),entityPath);
+            createRepository(entity_name);
         }
     }
 
-    public void createEntity(String name, List<JDLParser.Entity_fieldContext> fieldList) throws IOException {
-        String entityPath=baseDir.toString().concat("/src/main/java/"+packed+"/domain/"+name+".java");
-        Path path = Paths.get(entityPath);
-        CompilationUnit cu = null;
-        String code="";
-        if(!Files.exists(path)){
-            Template t=template(classPathResourceEntity);
-            StringWriter writer = new StringWriter();
-            VelocityContext context = new VelocityContext();
-            context.put("package", groupId);
-            context.put("entityName", name);
-            t.merge( context, writer );
-            code = writer.toString();
-            cu = parse(code);
-        }else {
-            FileInputStream fileInputStream= new FileInputStream(entityPath);
-            cu = parse(fileInputStream);
-        }
+    public CompilationUnit createEntity(String name, CompilationUnit cu, List<JDLParser.Entity_fieldContext> fieldList) throws IOException {
         Optional<ClassOrInterfaceDeclaration> classAST=cu.getClassByName(name);
         ClassOrInterfaceDeclaration AST=classAST.get();
         fieldList.forEach(e->{
-            String fieldType=e.entity_type().getText();
+            String fieldType=e.type().getText();
             String fieldName=e.ID().getText();
             List<JDLParser.Entity_validateContext> entity_validateContexts=e.entity_validate();
             if(!(AST.getFieldByName(fieldName).isPresent())){
@@ -169,20 +190,18 @@ public class TestParser extends AbstractMojo {
                 for (int i = 0; i < entity_validateContexts.size(); i++) {
                     switch (entity_validateContexts.get(i).getText()){
                         case "require":
-                            fieldDeclaration.addAnnotation("Notnull");
-                            //..................
+                            fieldDeclaration.addAnnotation("NotNull");
+                            cu.addImport("javax.validation.constraints.NotNull");
                     }
                 }
                 AST.getMembers().add(fieldDeclaration);
             }
         });
-        code=cu.toString();
-        writeCodeToFile(code,entityPath);
+        return cu;
     }
 
     public void createOneToOneRelationship(JDLParser.RelationshipContext relationshipContext) throws IOException {
         List<JDLParser.Relationsip_listContext> relationship_list=relationshipContext.relationsip_list();
-        JDLParser.Relation_typeContext relation_type=relationshipContext.relation_type();
         for (int i = 0; i < relationship_list.size(); i++) {
             String tableFrom=relationship_list.get(i).relation_ele(0).ID().getText();
             JDLParser.Relation_ele_bodyContext relation_ele_bodyFrom=relationship_list.get(i).relation_ele(0).relation_ele_body();
@@ -198,18 +217,13 @@ public class TestParser extends AbstractMojo {
                     relation_ele_bodyTo.REQUIRE().getText(): null;
             //create From
             String pathTableFrom=baseDir.toString().concat("/src/main/java/"+packed+"/domain/"+tableFrom+".java");
-            Path path = Paths.get(pathTableFrom);
-            CompilationUnit cu = null;
-            String code="";
-            if(Files.exists(path)){
-                FileInputStream fileInputStream= new FileInputStream(pathTableFrom);
-                cu = parse(fileInputStream);
+            CompilationUnit cu=loadCompilationUnit(pathTableFrom, null, null);
+            if(cu!=null){
                 Optional<ClassOrInterfaceDeclaration> classAST=cu.getClassByName(tableFrom);
                 ClassOrInterfaceDeclaration AST=classAST.get();
                 if(!AST.getFieldByName(relationNameFrom).isPresent()){
                     FieldDeclaration fieldDeclaration=new FieldDeclaration();
                     fieldDeclaration.addVariable(new VariableDeclarator(new ClassOrInterfaceType(tableTo),relationNameTo));
-
                     if(requireTo!=null){
                         NormalAnnotationExpr normalAnnotationExpr=new NormalAnnotationExpr();
                         normalAnnotationExpr.setName("OneToOne");
@@ -220,16 +234,11 @@ public class TestParser extends AbstractMojo {
                     cu.addImport("javax.persistence.OneToOne");
                 }
             }
-            code=cu.toString();
-            writeCodeToFile(code,pathTableFrom);
+            writeCodeToFile(cu.toString(),pathTableFrom);
             //create To
             String pathTableTo=baseDir.toString().concat("/src/main/java/"+packed+"/domain/"+tableTo+".java");
-            Path pathTo = Paths.get(pathTableTo);
-            CompilationUnit cu1 = null;
-            String code1="";
-            if(Files.exists(pathTo)){
-                FileInputStream fileInputStream= new FileInputStream(pathTableTo);
-                cu1 = parse(fileInputStream);
+            CompilationUnit cu1 = loadCompilationUnit(pathTableTo, null, null);
+            if(cu1!=null){
                 Optional<ClassOrInterfaceDeclaration> classAST=cu1.getClassByName(tableTo);
                 ClassOrInterfaceDeclaration AST=classAST.get();
                 if(!AST.getFieldByName(relationNameTo).isPresent()){
@@ -245,8 +254,7 @@ public class TestParser extends AbstractMojo {
                     cu1.addImport("javax.persistence.OneToOne");
                 }
             }
-            code1=cu1.toString();
-            writeCodeToFile(code1,pathTableTo);
+            writeCodeToFile(cu1.toString(),pathTableTo);
         }
     }
     public void createOneToManyRelationship(JDLParser.RelationshipContext relationshipContext) throws IOException {
@@ -389,7 +397,7 @@ public class TestParser extends AbstractMojo {
                     fieldDeclaration.addVariable(new VariableDeclarator(new ClassOrInterfaceType("Set<"+tableFrom+">"),relationNameFrom));
                     NormalAnnotationExpr manyToMany=new NormalAnnotationExpr();
                     manyToMany.setName("ManyToMany");
-                    manyToMany.addPair("mappedBy", "\""+relationNameFrom+"\"");
+                    manyToMany.addPair("mappedBy", "\""+relationNameTo+"\"");
                     if(requireTo!=null){
                         manyToMany.addPair("optional", String.valueOf(false));
                     }
@@ -404,45 +412,118 @@ public class TestParser extends AbstractMojo {
         }
     }
     //create relationship
+    public void relation(JDLParser.RelationshipContext relationshipContext, String type) throws IOException {
+        List<JDLParser.Relationsip_listContext> relationship_list=relationshipContext.relationsip_list();
+        JDLParser.Relation_typeContext relation_type=relationshipContext.relation_type();
+        for (int i = 0; i < relationship_list.size(); i++){
+            String tableFrom = relationship_list.get(i).relation_ele(0).ID().getText();
+            JDLParser.Relation_ele_bodyContext relation_ele_bodyFrom = relationship_list.get(i).relation_ele(0).relation_ele_body();
+            String relationNameFrom = relation_ele_bodyFrom != null ?
+                    relation_ele_bodyFrom.ID().getText() : StringUtils.uncapitalize(tableFrom);
+            String requireFrom = relation_ele_bodyFrom != null && relation_ele_bodyFrom.REQUIRE() != null ?
+                    relation_ele_bodyFrom.REQUIRE().getText() : null;
+            String tableTo = relationship_list.get(i).relation_ele(1).ID().getText();
+            JDLParser.Relation_ele_bodyContext relation_ele_bodyTo = relationship_list.get(i).relation_ele(1).relation_ele_body();
+            String relationNameTo = relation_ele_bodyTo != null ?
+                    relation_ele_bodyTo.ID().getText() : StringUtils.uncapitalize(tableTo);
+            String requireTo = relation_ele_bodyTo != null && relation_ele_bodyTo.REQUIRE() != null ?
+                    relation_ele_bodyTo.REQUIRE().getText() : null;
+            String pathTableFrom=baseDir.toString().concat("/src/main/java/"+packed+"/domain/"+tableFrom+".java");
+            CompilationUnit cu=loadCompilationUnit(pathTableFrom, null, null);
+            switch (type){
+                case "OneToOne":
+                    if(cu!=null){
+                        Optional<ClassOrInterfaceDeclaration> classAST=cu.getClassByName(tableFrom);
+                        ClassOrInterfaceDeclaration AST=classAST.get();
+                        if(!AST.getFieldByName(relationNameFrom).isPresent()){
+                            FieldDeclaration fieldDeclaration=new FieldDeclaration();
+                            fieldDeclaration.addVariable(new VariableDeclarator(new ClassOrInterfaceType(tableTo),relationNameTo));
+                            NormalAnnotationExpr normalAnnotationExpr=new NormalAnnotationExpr();
+                            normalAnnotationExpr.setName("OneToOne");
+                            if(requireTo!=null){
+                                normalAnnotationExpr.addPair("optional", String.valueOf(false));
+                                fieldDeclaration.addAnnotation(normalAnnotationExpr);
+                            }
+                            AST.getMembers().add(fieldDeclaration);
+                            cu.addImport("javax.persistence.OneToOne");
+                        }
+                    }
+                    writeCodeToFile(cu.toString(),pathTableFrom);
+
+                    String pathTableTo=baseDir.toString().concat("/src/main/java/"+packed+"/domain/"+tableTo+".java");
+                    CompilationUnit cu1 = loadCompilationUnit(pathTableTo, null, null);
+                    if(cu1!=null){
+                        Optional<ClassOrInterfaceDeclaration> classAST=cu1.getClassByName(tableTo);
+                        ClassOrInterfaceDeclaration AST=classAST.get();
+                        if(!AST.getFieldByName(relationNameTo).isPresent()){
+                            FieldDeclaration fieldDeclaration=new FieldDeclaration();
+                            fieldDeclaration.addVariable(new VariableDeclarator(new ClassOrInterfaceType(tableFrom),relationNameFrom));
+                            if(requireFrom!=null){
+                                NormalAnnotationExpr normalAnnotationExpr=new NormalAnnotationExpr();
+                                normalAnnotationExpr.setName("OneToOne");
+                                normalAnnotationExpr.addPair("optional", String.valueOf(false));
+                                fieldDeclaration.addAnnotation(normalAnnotationExpr);
+                            }
+                            AST.getMembers().add(fieldDeclaration);
+                            cu1.addImport("javax.persistence.OneToOne");
+                        }
+                    }
+                    writeCodeToFile(cu1.toString(),pathTableTo);
+                case "OneToMany":
+                case "ManyToOne":
+                case "ManyToMany":
+            }
+        }
+    }
     public  void createRelationShip(List<JDLParser.RelationshipContext> relationship) throws IOException {
         for (int i = 0; i < relationship.size(); i++) {
             JDLParser.RelationshipContext relationshipContext=relationship.get(i);
             JDLParser.Relation_typeContext relation_type=relationshipContext.relation_type();
             for (int j = 0; j < relationshipContext.relationsip_list().size(); j++) {
-                switch (relation_type.getText()){
-                    case "OneToOne":
-                        createOneToOneRelationship(relationshipContext);
-                    case "OneToMany":
-                        createOneToManyRelationship(relationshipContext);
-                    case "ManyToOne":
-                        createManyToOneRelationship(relationshipContext);
-                    case "ManyToMany":
-                        createManyToManyRelationship(relationshipContext);
-                }
+                relation(relationshipContext, relation_type.getText());
             }
         }
     }
 
-    public void addRelation(String fileNam){
+    public void createRepository(String name) throws IOException {
+        String pathRepo=baseDir.toString().concat("/src/main/java/"+packed+"/repository/"+name+"Repository.java");
+        Path path = Paths.get(pathRepo);
+        CompilationUnit cu = null;
+        String code="";
+        if(!Files.exists(path)){
+            Template t=template(classPathResourceRepository);
+            StringWriter writer = new StringWriter();
+            VelocityContext context = new VelocityContext();
+            context.put("package", groupId);
+            context.put("name", name);
+            t.merge( context, writer );
+            code = writer.toString();
+        }
+        writeCodeToFile(code,pathRepo);
+    }
 
+    public JDLParser.ProgramContext ParserJDL(String path) throws IOException {
+        JDLLexer jdlLexer = new JDLLexer(CharStreams.fromPath(Paths.get(path)));
+        CommonTokenStream commonTokenStream=new CommonTokenStream(jdlLexer);
+        JDLParser jdlParser=new JDLParser(commonTokenStream);
+        return jdlParser.program();
     }
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
         try{
+            //Read data
             packed=groupId.replace(".","/");
-            String path=project.getBasedir()+"/.vtskit/configuration/vts.txt";
-            JDLLexer jdlLexer = new JDLLexer(CharStreams.fromPath(Paths.get(path)));
-            CommonTokenStream commonTokenStream=new CommonTokenStream(jdlLexer);
-            JDLParser jdlParser=new JDLParser(commonTokenStream);
-            JDLParser.ProgramContext programContext=jdlParser.program();
-//            List<JDLParser.Dto_declarationContext> dto=programContext.dto_declaration();
+            String path=project.getBasedir()+"/.vtskit/configuration/vts.VDL";
+
+            JDLParser.ProgramContext programContext=ParserJDL(path);
+            List<JDLParser.Dto_declarationContext> dto=programContext.dto_declaration();
             List<JDLParser.Entity_declarationContext> entity=programContext.entity_declaration();
             List<JDLParser.RelationshipContext> relationship=programContext.relationship();
-            //create Entity
+
+//            createDTOs(dto);
             createEntitys(entity);
             createRelationShip(relationship);
-            //create Dto
-//            createDTOs(dto);
+
         }catch (Exception e){
             getLog().info(e);
         }

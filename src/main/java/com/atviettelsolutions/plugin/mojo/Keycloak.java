@@ -8,10 +8,7 @@ import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.project.MavenProject;
 
-import java.sql.Array;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 @Mojo(name = "addKeycloak")
@@ -37,7 +34,7 @@ public class Keycloak extends AbstractMojo {
             map.put("resource", "<your client id key>");
             map.put("ignore",new String[] { "/api-docs" });
             GenHelper.genProperties(project.getBasedir()+"/src/main/resources/application-local.yml", "keycloak", map);
-            GenHelper.genProperties(project.getBasedir()+"/src/main/resources/application-dev.yml", "keycloak", map);
+            GenHelper.genProperties(project.getBasedir()+"/src/main/resources/application-docker.yml", "keycloak", map);
         } catch (Exception e) {
             getLog().info(e.toString());
         }finally {

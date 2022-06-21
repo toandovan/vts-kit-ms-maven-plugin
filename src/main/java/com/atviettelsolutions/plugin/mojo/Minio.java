@@ -35,7 +35,7 @@ public class Minio extends AbstractMojo {
             map.put("bucket", "<your bucket>");
             map.put("auto-create-bucket", true);
             GenHelper.genProperties(project.getBasedir()+"/src/main/resources/application-local.yml", "minio", map);
-            GenHelper.genProperties(project.getBasedir()+"/src/main/resources/application-dev.yml", "minio", map);
+            GenHelper.genProperties(project.getBasedir()+"/src/main/resources/application-docker.yml", "minio", map);
         } catch (Exception e) {
             getLog().info(e.toString());
         }finally {
