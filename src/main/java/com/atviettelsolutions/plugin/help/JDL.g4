@@ -14,7 +14,9 @@ entity_validate: REQUIRE | UNIQUE;
 //relationship
 relationship: RELATIONSHIP relation_type LP relationsip_list+ RP;
 relationsip_list:relation_ele 'to' relation_ele SEMI;
-relation_ele: ID (LP ID (LB ID RB)? REQUIRE? RP)?;
+relation_ele: ID relation_ele_body?;
+relation_ele_body: LP ID display_field? REQUIRE? RP;
+display_field: LB ID RB;
 //DTO
 dto_declaration : DTO dto_list;
 dto_list: ID LSB dto_field* RSB;// DTO Test[ ABC String require, XYZ String require]

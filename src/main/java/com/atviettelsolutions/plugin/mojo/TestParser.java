@@ -11,6 +11,7 @@ import com.github.javaparser.ast.expr.NormalAnnotationExpr;
 import com.github.javaparser.ast.type.ClassOrInterfaceType;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
+import org.apache.commons.lang.StringUtils;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
@@ -179,28 +180,244 @@ public class TestParser extends AbstractMojo {
         writeCodeToFile(code,entityPath);
     }
 
+    public void createOneToOneRelationship(JDLParser.RelationshipContext relationshipContext) throws IOException {
+        List<JDLParser.Relationsip_listContext> relationship_list=relationshipContext.relationsip_list();
+        JDLParser.Relation_typeContext relation_type=relationshipContext.relation_type();
+        for (int i = 0; i < relationship_list.size(); i++) {
+            String tableFrom=relationship_list.get(i).relation_ele(0).ID().getText();
+            JDLParser.Relation_ele_bodyContext relation_ele_bodyFrom=relationship_list.get(i).relation_ele(0).relation_ele_body();
+            String relationNameFrom=relation_ele_bodyFrom!=null?
+                    relation_ele_bodyFrom.ID().getText(): StringUtils.uncapitalize(tableFrom);
+            String requireFrom=relation_ele_bodyFrom!=null && relation_ele_bodyFrom.REQUIRE()!=null?
+                    relation_ele_bodyFrom.REQUIRE().getText(): null;
+            String tableTo=relationship_list.get(i).relation_ele(1).ID().getText();
+            JDLParser.Relation_ele_bodyContext relation_ele_bodyTo=relationship_list.get(i).relation_ele(1).relation_ele_body();
+            String relationNameTo=relation_ele_bodyTo!=null?
+                    relation_ele_bodyTo.ID().getText(): StringUtils.uncapitalize(tableTo);
+            String requireTo=relation_ele_bodyTo!=null && relation_ele_bodyTo.REQUIRE()!=null?
+                    relation_ele_bodyTo.REQUIRE().getText(): null;
+            //create From
+            String pathTableFrom=baseDir.toString().concat("/src/main/java/"+packed+"/domain/"+tableFrom+".java");
+            Path path = Paths.get(pathTableFrom);
+            CompilationUnit cu = null;
+            String code="";
+            if(Files.exists(path)){
+                FileInputStream fileInputStream= new FileInputStream(pathTableFrom);
+                cu = parse(fileInputStream);
+                Optional<ClassOrInterfaceDeclaration> classAST=cu.getClassByName(tableFrom);
+                ClassOrInterfaceDeclaration AST=classAST.get();
+                if(!AST.getFieldByName(relationNameFrom).isPresent()){
+                    FieldDeclaration fieldDeclaration=new FieldDeclaration();
+                    fieldDeclaration.addVariable(new VariableDeclarator(new ClassOrInterfaceType(tableTo),relationNameTo));
+
+                    if(requireTo!=null){
+                        NormalAnnotationExpr normalAnnotationExpr=new NormalAnnotationExpr();
+                        normalAnnotationExpr.setName("OneToOne");
+                        normalAnnotationExpr.addPair("optional", String.valueOf(false));
+                        fieldDeclaration.addAnnotation(normalAnnotationExpr);
+                    }
+                    AST.getMembers().add(fieldDeclaration);
+                    cu.addImport("javax.persistence.OneToOne");
+                }
+            }
+            code=cu.toString();
+            writeCodeToFile(code,pathTableFrom);
+            //create To
+            String pathTableTo=baseDir.toString().concat("/src/main/java/"+packed+"/domain/"+tableTo+".java");
+            Path pathTo = Paths.get(pathTableTo);
+            CompilationUnit cu1 = null;
+            String code1="";
+            if(Files.exists(pathTo)){
+                FileInputStream fileInputStream= new FileInputStream(pathTableTo);
+                cu1 = parse(fileInputStream);
+                Optional<ClassOrInterfaceDeclaration> classAST=cu1.getClassByName(tableTo);
+                ClassOrInterfaceDeclaration AST=classAST.get();
+                if(!AST.getFieldByName(relationNameTo).isPresent()){
+                    FieldDeclaration fieldDeclaration=new FieldDeclaration();
+                    fieldDeclaration.addVariable(new VariableDeclarator(new ClassOrInterfaceType(tableFrom),relationNameFrom));
+                    if(requireFrom!=null){
+                        NormalAnnotationExpr normalAnnotationExpr=new NormalAnnotationExpr();
+                        normalAnnotationExpr.setName("OneToOne");
+                        normalAnnotationExpr.addPair("optional", String.valueOf(false));
+                        fieldDeclaration.addAnnotation(normalAnnotationExpr);
+                    }
+                    AST.getMembers().add(fieldDeclaration);
+                    cu1.addImport("javax.persistence.OneToOne");
+                }
+            }
+            code1=cu1.toString();
+            writeCodeToFile(code1,pathTableTo);
+        }
+    }
+    public void createOneToManyRelationship(JDLParser.RelationshipContext relationshipContext) throws IOException {
+        List<JDLParser.Relationsip_listContext> relationship_list=relationshipContext.relationsip_list();
+        JDLParser.Relation_typeContext relation_type=relationshipContext.relation_type();
+        for (int i = 0; i < relationship_list.size(); i++) {
+            String tableFrom = relationship_list.get(i).relation_ele(0).ID().getText();
+            JDLParser.Relation_ele_bodyContext relation_ele_bodyFrom = relationship_list.get(i).relation_ele(0).relation_ele_body();
+            String relationNameFrom = relation_ele_bodyFrom != null ?
+                    relation_ele_bodyFrom.ID().getText() : StringUtils.uncapitalize(tableFrom);
+            String requireFrom = relation_ele_bodyFrom != null && relation_ele_bodyFrom.REQUIRE() != null ?
+                    relation_ele_bodyFrom.REQUIRE().getText() : null;
+            String tableTo = relationship_list.get(i).relation_ele(1).ID().getText();
+            JDLParser.Relation_ele_bodyContext relation_ele_bodyTo = relationship_list.get(i).relation_ele(1).relation_ele_body();
+            String relationNameTo = relation_ele_bodyTo != null ?
+                    relation_ele_bodyTo.ID().getText() : StringUtils.uncapitalize(tableTo);
+            String requireTo = relation_ele_bodyTo != null && relation_ele_bodyTo.REQUIRE() != null ?
+                    relation_ele_bodyTo.REQUIRE().getText() : null;
+
+            String pathTableFrom=baseDir.toString().concat("/src/main/java/"+packed+"/domain/"+tableFrom+".java");
+            Path path = Paths.get(pathTableFrom);
+            CompilationUnit cu = null;
+            String code="";
+            if(Files.exists(path)){
+                FileInputStream fileInputStream= new FileInputStream(pathTableFrom);
+                cu = parse(fileInputStream);
+                Optional<ClassOrInterfaceDeclaration> classAST=cu.getClassByName(tableFrom);
+                ClassOrInterfaceDeclaration AST=classAST.get();
+                if(!AST.getFieldByName(relationNameFrom).isPresent()){
+                    FieldDeclaration fieldDeclaration=new FieldDeclaration();
+                    fieldDeclaration.addVariable(new VariableDeclarator(new ClassOrInterfaceType("Set<"+tableTo+">"),relationNameTo));
+                    NormalAnnotationExpr normalAnnotationExpr=new NormalAnnotationExpr();
+                    normalAnnotationExpr.setName("OneToMany");
+                    normalAnnotationExpr.addPair("mappedBy", "\""+relationNameFrom+"\"");
+                    if(requireTo!=null){
+                        normalAnnotationExpr.addPair("optional", String.valueOf(false));
+                    }
+                    fieldDeclaration.addAnnotation(normalAnnotationExpr);
+                    AST.getMembers().add(fieldDeclaration);
+                    cu.addImport("javax.persistence.OneToMany");
+                }
+            }
+            code=cu.toString();
+            writeCodeToFile(code,pathTableFrom);
+            //create To
+            String pathTableTo=baseDir.toString().concat("/src/main/java/"+packed+"/domain/"+tableTo+".java");
+            Path pathTo = Paths.get(pathTableTo);
+            CompilationUnit cu1 = null;
+            String code1="";
+            if(Files.exists(pathTo)){
+                FileInputStream fileInputStream= new FileInputStream(pathTableTo);
+                cu1 = parse(fileInputStream);
+                Optional<ClassOrInterfaceDeclaration> classAST=cu1.getClassByName(tableTo);
+                ClassOrInterfaceDeclaration AST=classAST.get();
+                if(!AST.getFieldByName(relationNameTo).isPresent()){
+                    FieldDeclaration fieldDeclaration=new FieldDeclaration();
+                    fieldDeclaration.addVariable(new VariableDeclarator(new ClassOrInterfaceType(tableFrom),relationNameFrom));
+                    NormalAnnotationExpr manyToOne=new NormalAnnotationExpr();
+                    manyToOne.setName("ManyToOne");
+                    if(requireFrom!=null){
+                        manyToOne.addPair("optional", String.valueOf(false));
+                    }
+                    fieldDeclaration.addAnnotation(manyToOne);
+                    NormalAnnotationExpr joinColumn=new NormalAnnotationExpr();
+                    joinColumn.setName("JoinColumn");
+                    joinColumn.addPair("name", "\""+StringUtils.uncapitalize(tableFrom)+"_id"+ "\"");
+                    fieldDeclaration.addAnnotation(joinColumn);
+                    AST.getMembers().add(fieldDeclaration);
+                    cu1.addImport("javax.persistence.ManyToOne");
+                }
+            }
+            code1=cu1.toString();
+            writeCodeToFile(code1,pathTableTo);
+        }
+    }
+    public void createManyToOneRelationship(JDLParser.RelationshipContext relationshipContext){
+
+    }
+    public void createManyToManyRelationship(JDLParser.RelationshipContext relationshipContext) throws IOException {
+        List<JDLParser.Relationsip_listContext> relationship_list=relationshipContext.relationsip_list();
+        JDLParser.Relation_typeContext relation_type=relationshipContext.relation_type();
+        for (int i = 0; i < relationship_list.size(); i++) {
+            String tableFrom = relationship_list.get(i).relation_ele(0).ID().getText();
+            JDLParser.Relation_ele_bodyContext relation_ele_bodyFrom = relationship_list.get(i).relation_ele(0).relation_ele_body();
+            String relationNameFrom = relation_ele_bodyFrom != null ?
+                    relation_ele_bodyFrom.ID().getText() : StringUtils.uncapitalize(tableFrom);
+            String requireFrom = relation_ele_bodyFrom != null && relation_ele_bodyFrom.REQUIRE() != null ?
+                    relation_ele_bodyFrom.REQUIRE().getText() : null;
+            String tableTo = relationship_list.get(i).relation_ele(1).ID().getText();
+            JDLParser.Relation_ele_bodyContext relation_ele_bodyTo = relationship_list.get(i).relation_ele(1).relation_ele_body();
+            String relationNameTo = relation_ele_bodyTo != null ?
+                    relation_ele_bodyTo.ID().getText() : StringUtils.uncapitalize(tableTo);
+            String requireTo = relation_ele_bodyTo != null && relation_ele_bodyTo.REQUIRE() != null ?
+                    relation_ele_bodyTo.REQUIRE().getText() : null;
+
+            String pathTableFrom=baseDir.toString().concat("/src/main/java/"+packed+"/domain/"+tableFrom+".java");
+            Path path = Paths.get(pathTableFrom);
+            CompilationUnit cu = null;
+            String code="";
+            if(Files.exists(path)){
+                FileInputStream fileInputStream= new FileInputStream(pathTableFrom);
+                cu = parse(fileInputStream);
+                Optional<ClassOrInterfaceDeclaration> classAST=cu.getClassByName(tableFrom);
+                ClassOrInterfaceDeclaration AST=classAST.get();
+                if(!AST.getFieldByName(relationNameFrom).isPresent()){
+                    FieldDeclaration fieldDeclaration=new FieldDeclaration();
+                    fieldDeclaration.addVariable(new VariableDeclarator(new ClassOrInterfaceType("Set<"+tableTo+">"),relationNameTo));
+                    NormalAnnotationExpr manyToMany=new NormalAnnotationExpr();
+                    manyToMany.setName("ManyToMany");
+                    if(requireTo!=null){
+                        manyToMany.addPair("optional", String.valueOf(false));
+                    }
+                    fieldDeclaration.addAnnotation(manyToMany);
+                    NormalAnnotationExpr normalAnnotationExpr=new NormalAnnotationExpr();
+                    normalAnnotationExpr.setName("JoinTable");
+                    normalAnnotationExpr.addPair("joinColumns"," @JoinColumn(name = \""+StringUtils.uncapitalize(tableFrom)+"_id" +"\")");
+                    normalAnnotationExpr.addPair("inverseJoinColumns", " @JoinColumn(name = \""+StringUtils.uncapitalize(tableTo)+"_id"  +"\")");
+                    fieldDeclaration.addAnnotation(normalAnnotationExpr);
+                    AST.getMembers().add(fieldDeclaration);
+                    cu.addImport("javax.persistence.ManyToMany");
+                    cu.addImport("javax.persistence.JoinTable");
+                    cu.addImport("javax.persistence.JoinColumn");
+                    cu.addImport("java.util.Set");
+                }
+            }
+            code=cu.toString();
+            writeCodeToFile(code,pathTableFrom);
+            //create To
+            String pathTableTo=baseDir.toString().concat("/src/main/java/"+packed+"/domain/"+tableTo+".java");
+            Path pathTo = Paths.get(pathTableTo);
+            CompilationUnit cu1 = null;
+            String code1="";
+            if(Files.exists(pathTo)){
+                FileInputStream fileInputStream= new FileInputStream(pathTableTo);
+                cu1 = parse(fileInputStream);
+                Optional<ClassOrInterfaceDeclaration> classAST=cu1.getClassByName(tableTo);
+                ClassOrInterfaceDeclaration AST=classAST.get();
+                if(!AST.getFieldByName(relationNameTo).isPresent()){
+                    FieldDeclaration fieldDeclaration=new FieldDeclaration();
+                    fieldDeclaration.addVariable(new VariableDeclarator(new ClassOrInterfaceType("Set<"+tableFrom+">"),relationNameFrom));
+                    NormalAnnotationExpr manyToMany=new NormalAnnotationExpr();
+                    manyToMany.setName("ManyToMany");
+                    manyToMany.addPair("mappedBy", "\""+relationNameFrom+"\"");
+                    if(requireTo!=null){
+                        manyToMany.addPair("optional", String.valueOf(false));
+                    }
+                    fieldDeclaration.addAnnotation(manyToMany);
+                    AST.getMembers().add(fieldDeclaration);
+                    cu1.addImport("javax.persistence.ManyToMany");
+                    cu1.addImport("java.util.Set");
+                }
+            }
+            code1=cu1.toString();
+            writeCodeToFile(code1,pathTableTo);
+        }
+    }
     //create relationship
-    public  void createRelationShip(List<JDLParser.RelationshipContext> relationship){
+    public  void createRelationShip(List<JDLParser.RelationshipContext> relationship) throws IOException {
         for (int i = 0; i < relationship.size(); i++) {
             JDLParser.RelationshipContext relationshipContext=relationship.get(i);
             JDLParser.Relation_typeContext relation_type=relationshipContext.relation_type();
             for (int j = 0; j < relationshipContext.relationsip_list().size(); j++) {
-                String tableFrom= relationshipContext
-                        .relationsip_list().get(0).relation_ele(0).ID(0).getText();
-                String tableTo= relationshipContext
-                        .relationsip_list().get(0).relation_ele(1).ID(0).getText();
                 switch (relation_type.getText()){
                     case "OneToOne":
-                        System.out.printf("");
-                        //create
+                        createOneToOneRelationship(relationshipContext);
                     case "OneToMany":
-                        System.out.printf("");
-                        //create
+                        createOneToManyRelationship(relationshipContext);
                     case "ManyToOne":
-                        System.out.printf("");
-                        //create
+                        createManyToOneRelationship(relationshipContext);
                     case "ManyToMany":
-                        System.out.printf("");
+                        createManyToManyRelationship(relationshipContext);
                 }
             }
         }
@@ -218,11 +435,12 @@ public class TestParser extends AbstractMojo {
             CommonTokenStream commonTokenStream=new CommonTokenStream(jdlLexer);
             JDLParser jdlParser=new JDLParser(commonTokenStream);
             JDLParser.ProgramContext programContext=jdlParser.program();
-            List<JDLParser.Dto_declarationContext> dto=programContext.dto_declaration();
+//            List<JDLParser.Dto_declarationContext> dto=programContext.dto_declaration();
             List<JDLParser.Entity_declarationContext> entity=programContext.entity_declaration();
             List<JDLParser.RelationshipContext> relationship=programContext.relationship();
             //create Entity
-//            createEntitys(entity);
+            createEntitys(entity);
+            createRelationShip(relationship);
             //create Dto
 //            createDTOs(dto);
         }catch (Exception e){
