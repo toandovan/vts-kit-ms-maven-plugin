@@ -1,0 +1,54 @@
+package ${package}.service.impl;
+
+import ${package}.domain.${name};
+import ${package}.dto.${name}DTO;
+import ${package}.mapper.${name}Mapper;
+import ${package}.repository.${name}Repository;
+import ${package}.repository.impl.${name}RepositoryImpl;
+import ${package}.service.${name}Service;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+@Service
+public class ${name}ServiceImpl implements ${name}Service {
+
+    private ${name}Repository ${lowcaseName}Repository;
+    private ${name}Mapper ${lowcaseName}Mapper;
+
+    @Override
+    public ${name}DTO create${name}(${name}DTO ${lowcaseName}) {
+        return ${lowcaseName}Mapper.toDest(${lowcaseName}Repository.save(${lowcaseName}));
+    }
+
+    @Override
+    public ${name}DTO update${name}(${name}DTO ${lowcaseName}) {
+        return ${lowcaseName}Mapper.toDest(${lowcaseName}Repository.save(${lowcaseName}));
+    }
+
+    @Override
+    public ${name}DTO delete${name}(String ${lowcaseName}Id) {
+        return ${lowcaseName}Mapper.toDest(${lowcaseName}Repository.deleteById(${lowcaseName}Id));
+    }
+
+    @Override
+    public ${name}DTO get${name}Detail(String ${lowcaseName}Id) {
+        return ${lowcaseName}Mapper.toDest(${lowcaseName}Repository.getById(${lowcaseName}Id));
+    }
+
+    @Override
+    public List<${name}DTO> getList${name}() {
+        return ${lowcaseName}Mapper.toDest(${lowcaseName}Repository.findAll());
+    }
+
+    @Autowired
+    public void set${name}Repository(${name}Repository ${lowcaseName}Repository) {
+        this.${lowcaseName}Repository = ${lowcaseName}Repository;
+    }
+
+    @Autowired
+    public void set${name}Mapper(${name}Mapper ${lowcaseName}Mapper) {
+        this.${lowcaseName}Mapper = ${lowcaseName}Mapper;
+    }
+}

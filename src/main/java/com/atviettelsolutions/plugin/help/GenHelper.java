@@ -15,18 +15,13 @@ import org.yaml.snakeyaml.representer.Representer;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
-import javax.xml.transform.OutputKeys;
-import javax.xml.transform.Transformer;
-import javax.xml.transform.TransformerException;
-import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.*;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 import javax.xml.transform.stream.StreamSource;
 import java.io.*;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.TreeMap;
+import java.text.SimpleDateFormat;
+import java.util.*;
 import java.util.function.BiConsumer;
 
 public class GenHelper {
@@ -180,4 +175,43 @@ public class GenHelper {
         yaml.dump(data, writer);
         writer.close();
     }
+
+    //check Dependency
+    public static boolean checkDependency(MavenProject project, String artifactId) throws ParserConfigurationException, IOException, SAXException {
+        File pom = project.getModel().getPomFile();
+        DocumentBuilderFactory factory =
+                DocumentBuilderFactory.newInstance();
+        DocumentBuilder builder = factory.newDocumentBuilder();
+        Document doc = builder.parse(pom);
+        Element root = doc.getDocumentElement();
+        doc.getDocumentElement().normalize();
+        NodeList nList = doc.getElementsByTagName("dependencies");
+        for (int i = 0; i < nList.getLength(); i++) {
+            Node nNode = nList.item(i);
+            String parent = nNode.getParentNode().getNodeName();
+            if (!parent.equals("dependencyManagement")
+                    && parent.equals("project")) {
+                NodeList n = nNode.getChildNodes();
+                int count = 0;
+                Boolean duplicate = false;
+                for (int j = 0; j < n.getLength(); j++) {
+                    if (n.item(j).getNodeName().equals("dependency")) {
+                        NodeList childDependency = n.item(j).getChildNodes();
+                        for (int k = 0; k < childDependency.getLength(); k++) {
+                            if (!childDependency.item(k).getNodeName().equals("#text")) {
+                                NodeList nodeK = childDependency.item(k).getChildNodes();
+                                for (int l = 0; l < nodeK.getLength(); l++) {
+                                    if (nodeK.item(l).getNodeValue().equals(artifactId)) {
+                                        return true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
 }

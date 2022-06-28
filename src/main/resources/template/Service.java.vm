@@ -1,0 +1,13 @@
+package ${package}.service;
+
+import com.example.dto.${name}DTO;
+
+import java.util.List;
+
+public interface ${name}Service {
+        ${name}DTO create${name}(${name}DTO ${lowcaseName});
+        ${name}DTO update${name}(${name}DTO ${lowcaseName});
+        ${name}DTO delete${name}(String ${lowcaseName}Id);
+        ${name}DTO get${name}Detail(String ${lowcaseName}Id);
+        List<${name}DTO> getList${name}();
+}

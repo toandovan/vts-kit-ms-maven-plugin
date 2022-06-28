@@ -2,8 +2,6 @@ grammar JDL;
 
 program: (entity_declaration|relationship |dto_declaration)* EOF;
 
-
-
 // api_declaration: API ;
 entity_declaration : ENTITY ID table_name? entity_body?; 
 table_name: LSB ID RSB;
@@ -22,13 +20,13 @@ dto_declaration : DTO dto_list;
 dto_list: ID LSB dto_field* RSB;// DTO Test[ ABC String require, XYZ String require]
 dto_field: ID type REQUIRE? SEMI;
 
-type: STRING | FLOAT | DOUBLE | LONG;
+type: STRING | FLOAT | DOUBLE | LONG | INTERGER;
 //Type:
 STRING: 'String';
 FLOAT: 'Float';
 DOUBLE: 'Double';
 LONG: 'Long';
-
+INTERGER: 'Interger';
 
 //(OneToMany | ManyToOne | OneToOne | ManyToMany)
 ONETOONE: 'OneToOne';

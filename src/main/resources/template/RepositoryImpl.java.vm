@@ -1,0 +1,12 @@
+package ${package}.repository.impl;
+
+import com.example.repository.${name}Repository;
+import com.example.utils.CommonUtils;
+
+import com.viettel.vtskit.maria.repository.MariaRepository;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public class ${name}RepositoryImpl implements ${name}Repository {
+
+}
