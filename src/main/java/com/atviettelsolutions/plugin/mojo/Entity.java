@@ -33,7 +33,7 @@ import java.util.Optional;
 import static com.github.javaparser.StaticJavaParser.parse;
 
 
-@Mojo(name = "Entity")
+@Mojo(name = "entity")
 public class Entity extends AbstractMojo {
     /**
      * @parameter default-value="${project}"
@@ -446,7 +446,7 @@ public class Entity extends AbstractMojo {
     public void execute() throws MojoExecutionException, MojoFailureException {
         try{
             packed=groupId.replace(".","/");
-            String path=project.getBasedir()+"/.vtskit/configuration/vts.VDL";
+            String path=System.getProperties().containsKey("entityConfiguration")?baseDir.toString().concat("/.vtskit/configuration/"+System.getProperty("entityConfiguration")+".VDL"):"";
             JDLParser.ProgramContext programContext=ParserJDL(path);
             List<JDLParser.Dto_declarationContext> dto=programContext.dto_declaration();
             List<JDLParser.Entity_declarationContext> entity=programContext.entity_declaration();
