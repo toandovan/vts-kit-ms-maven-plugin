@@ -1,6 +1,5 @@
 package com.atviettelsolutions.plugin.mojo;
 
-import com.atviettelsolutions.plugin.help.GenHelper;
 import com.atviettelsolutions.plugin.help.WriteFileToTemp;
 import com.atviettelsolutions.plugin.help.antlr.JDLLexer;
 import com.atviettelsolutions.plugin.help.antlr.JDLParser;
@@ -10,7 +9,6 @@ import com.github.javaparser.ast.body.FieldDeclaration;
 import com.github.javaparser.ast.body.VariableDeclarator;
 import com.github.javaparser.ast.expr.NormalAnnotationExpr;
 import com.github.javaparser.ast.type.ClassOrInterfaceType;
-import liquibase.Liquibase;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.apache.commons.lang.StringUtils;
@@ -23,7 +21,6 @@ import org.apache.maven.project.MavenProject;
 import org.apache.velocity.Template;
 import org.apache.velocity.VelocityContext;
 import org.apache.velocity.app.VelocityEngine;
-import org.liquibase.maven.plugins.LiquibaseDatabaseDiff;
 
 import java.io.*;
 import java.nio.file.Files;
@@ -36,8 +33,8 @@ import java.util.Optional;
 import static com.github.javaparser.StaticJavaParser.parse;
 
 
-@Mojo(name = "Parser")
-public class TestParser extends AbstractMojo {
+@Mojo(name = "Entity")
+public class Entity extends AbstractMojo {
     /**
      * @parameter default-value="${project}"
      * @required
@@ -57,12 +54,11 @@ public class TestParser extends AbstractMojo {
     String classPathResourceMapper = "template/Mapper.java.vm";
     String classPathResourceCRUD = "template/Service.java.vm";
     String classPathResourceCRUDImpl = "template/ServiceImpl.java.vm";
-    public TestParser() {
+    public Entity() {
         this.velocityEngine=new VelocityEngine();
         velocityEngine.setProperty("file.resource.loader.path", "");
         velocityEngine.init();
     }
-
     public Template template(String classPathResource) throws IOException {
         ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
         InputStream inputStream=classLoader.getResourceAsStream(classPathResource);
@@ -249,6 +245,22 @@ public class TestParser extends AbstractMojo {
                             cu.addImport("java.util.Set");
                             break;
                         case "ManyToOne":
+                            fieldDeclaration.addVariable(new VariableDeclarator(new ClassOrInterfaceType(tableTo),relationNameTo));
+                            NormalAnnotationExpr manyToOne=new NormalAnnotationExpr();
+                            manyToOne.setName("ManyToOne");
+                            if(requireFrom!=null){
+                                manyToOne.addPair("optional", String.valueOf(false));
+                            }
+                            fieldDeclaration.addAnnotation(manyToOne);
+                            NormalAnnotationExpr joinColumn=new NormalAnnotationExpr();
+                            joinColumn.setName("JoinColumn");
+                            joinColumn.addPair("name", "\""+StringUtils.uncapitalize(tableTo)+"_id"+ "\"");
+                            fieldDeclaration.addAnnotation(joinColumn);
+                            AST.getMembers().add(fieldDeclaration);
+                            cu.addImport("javax.persistence.ManyToOne");
+                            cu.addImport("java.util.Set");
+                            cu.addImport("javax.persistence.JoinColumn");
+                            break;
                         case "ManyToMany":
                             fieldDeclaration.addVariable(new VariableDeclarator(new ClassOrInterfaceType("Set<"+tableTo+">"),relationNameTo));
                             NormalAnnotationExpr manyToMany=new NormalAnnotationExpr();
@@ -308,6 +320,17 @@ public class TestParser extends AbstractMojo {
                             cu1.addImport("javax.persistence.JoinColumn");
                             break;
                         case "ManyToOne":
+                            fieldDeclaration.addVariable(new VariableDeclarator(new ClassOrInterfaceType("Set<"+tableFrom+">"),relationNameFrom));
+                            normalAnnotationExpr.setName("OneToMany");
+                            normalAnnotationExpr.addPair("mappedBy", "\""+relationNameTo+"\"");
+                            if(requireTo!=null){
+                                normalAnnotationExpr.addPair("optional", String.valueOf(false));
+                            }
+                            fieldDeclaration.addAnnotation(normalAnnotationExpr);
+                            AST.getMembers().add(fieldDeclaration);
+                            cu1.addImport("javax.persistence.OneToMany");
+                            cu1.addImport("java.util.Set");
+                            break;
                         case "ManyToMany":
                             fieldDeclaration.addVariable(new VariableDeclarator(new ClassOrInterfaceType("Set<"+tableFrom+">"),relationNameFrom));
                             NormalAnnotationExpr manyToMany=new NormalAnnotationExpr();
@@ -413,9 +436,6 @@ public class TestParser extends AbstractMojo {
             writeCodeToFile(code,pathRepo);
         }
     }
-    public void createLiquibase(){
-
-    }
     public JDLParser.ProgramContext ParserJDL(String path) throws IOException {
         JDLLexer jdlLexer = new JDLLexer(CharStreams.fromPath(Paths.get(path)));
         CommonTokenStream commonTokenStream=new CommonTokenStream(jdlLexer);
@@ -434,8 +454,6 @@ public class TestParser extends AbstractMojo {
             createDTOs(dto);
             createEntitys(entity);
             createRelationShip(relationship);
-            LiquibaseDatabaseDiff liquibaseDatabaseDiff=new LiquibaseDatabaseDiff();
-            liquibaseDatabaseDiff.execute();
         }catch (Exception e){
             getLog().info(e);
         }

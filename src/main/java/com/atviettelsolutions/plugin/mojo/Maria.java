@@ -7,12 +7,11 @@ import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.project.MavenProject;
-
 import java.util.HashMap;
 import java.util.Map;
 
-@Mojo(name = "addMinio")
-public class Minio extends AbstractMojo {
+@Mojo(name = "addMaria")
+public class Maria extends AbstractMojo {
     /**
      * @parameter default-value="${project}"
      * @required
@@ -27,21 +26,20 @@ public class Minio extends AbstractMojo {
      */
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
-        try {
-            GenHelper.genDependency(project,"com.atviettelsolutions","vts-kit-ms-minio-integrated","1.0.0");
+        try{
+            GenHelper.genDependency(project,"com.atviettelsolutions","vts-kit-ms-maria-data","1.0.0");
             Map map=new HashMap();
-            map.put("server", "<https://host:port>");
-            map.put("access-key", "<your access key>");
-            map.put("secret-key", "<your secret key>");
-            map.put("bucket", "<your bucket>");
-            map.put("auto-create-bucket", true);
-            GenHelper.genProperties(project.getBasedir()+"/src/main/resources/application-local.yml", "minio", map);
-            GenHelper.genProperties(project.getBasedir()+"/src/main/resources/application-docker.yml", "minio", map);
-        } catch (Exception e) {
+            Map map1=new HashMap();
+            map1.put("url", "<https://host:port>");
+            map1.put("username", "<your-username>");
+            map1.put("password", "<your-password>");
+            map.put("datasource",map1);
+            GenHelper.genProperties(project.getBasedir()+"/src/main/resources/application-local.yml", "mariadb", map);
+            GenHelper.genProperties(project.getBasedir()+"/src/main/resources/application-docker.yml", "mariadb", map);
+        }catch (Exception e) {
             getLog().info(e.toString());
         }finally {
-            getLog().info("Read details in https://github.com/vts-contributor/vts-kit-ms-minio-integrated");
+            getLog().info("Read details in https://github.com/vts-contributor/vts-kit-ms-maria-data");
         }
     }
-
 }
